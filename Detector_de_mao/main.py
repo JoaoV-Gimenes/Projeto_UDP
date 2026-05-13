@@ -4,8 +4,100 @@ import cv2
 import numpy as np
 import mediapipe as mp
 from mediapipe.tasks import python
-from mediapipe.tasks.python.vision import HandLandmarker, HandLandmarkerOptions, RunningMode
+from mediapipe.tasks.python import vision
+import matplotlib.pyplot as plt
+from mediapipe.tasks.python.vision import HandLandmarker, HandLandmarkerOptions, RunningMode, drawing_utils, drawing_styles, FaceLandmarker, FaceLandmarkerOptions
 import time
+
+
+class DetectorRosto:
+    """Classe responsável pela detecção do rosto"""
+
+    def __init__(self, max_rosto= 1, deteccao_confianca= 0.5):
+
+        self.resultado = None
+        self.blendshapes = []
+
+        options = FaceLandmarkerOptions(
+            base_options = python.BaseOptions(model_asset_path = 'face_landmarker.task'),
+            running_mode = RunningMode.LIVE_STREAM,
+            num_faces = max_rosto,
+            min_face_detection_confidence = deteccao_confianca,
+            output_face_blendshapes = True,
+            result_callback = self.callback_resultado
+        )
+        self.detector = FaceLandmarker.create_from_options(options)
+
+    def callback_resultado (self, resultado, imagem_saida, timestamp_ms):
+        self.resultado = resultado
+        self.blendshapes = resultado.face_blendshapes if resultado.face_blendshapes else []
+
+    def encontra_rosto(self, imagem, desenho = True):
+
+        ## BGR para RGB
+        imagem_rgb = cv2.cvtColor(imagem, cv2.COLOR_BGR2RGB)
+        imagem_rgb = np.array(imagem_rgb)
+
+        ## Converte para o formato do mediapipe
+        mp_imagem = mp.Image(image_format=mp.ImageFormat.SRGB, data = imagem_rgb)
+
+        ## Timestamp
+        timestamp = int(time.time()*1000)
+
+        ## Envia para a detecção assíncrona
+        self.detector.detect_async(mp_imagem, timestamp)
+
+        ## Desenha os landmarks
+        if desenho and self.resultado and self.resultado.face_landmarks:
+            for rosto in self.resultado.face_landmarks:
+                ## Malha do rosto
+                drawing_utils.draw_landmarks(
+                    image=imagem,
+                    landmark_list=rosto,
+                    connections=vision.FaceLandmarksConnections.FACE_LANDMARKS_TESSELATION,
+                    landmark_drawing_spec=None,
+                    connection_drawing_spec=drawing_styles.get_default_face_mesh_tesselation_style())
+
+                ## Contornos
+                drawing_utils.draw_landmarks(
+                    image=imagem,
+                    landmark_list=rosto,
+                    connections=vision.FaceLandmarksConnections.FACE_LANDMARKS_CONTOURS,
+                    landmark_drawing_spec=None,
+                    connection_drawing_spec=drawing_styles.get_default_face_mesh_contours_style())
+
+                ## Íris esquerda
+                drawing_utils.draw_landmarks(
+                    image=imagem,
+                    landmark_list=rosto,
+                    connections=vision.FaceLandmarksConnections.FACE_LANDMARKS_LEFT_IRIS,
+                    landmark_drawing_spec=None,
+                    connection_drawing_spec=drawing_styles.get_default_face_mesh_iris_connections_style())
+
+                ## Íris direita
+                drawing_utils.draw_landmarks(
+                    image=imagem,
+                    landmark_list=rosto,
+                    connections=vision.FaceLandmarksConnections.FACE_LANDMARKS_RIGHT_IRIS,
+                    landmark_drawing_spec=None,
+                    connection_drawing_spec=drawing_styles.get_default_face_mesh_iris_connections_style())
+
+    def detecta_gestos(self, confianca_minima):
+        if not self.blendshapes:
+            return []
+        gestos_detectados = []
+        for blendshape in self.blendshapes[0]:
+            if blendshape.score >= confianca_minima:
+                gestos_detectados.append({
+                    'gesto': blendshape.category_name,
+                    'confianca' : round(blendshape.score, 2)
+                })
+        return gestos_detectados
+
+
+
+
+
 
 class DetectorMaos:
     """Classe responsável pela detecção das mãos"""
@@ -71,7 +163,7 @@ class DetectorMaos:
         self.detector.detect_async(mp_imagem, timestamp)
 
         ## Desenhar os pontos se encontrar mãos e desenho = True
-        if desenho and self.resultado.hand_landmarks and self.resultado:
+        if desenho and self.resultado and self.resultado.hand_landmarks:
             for mao in self.resultado.hand_landmarks:
                 for ponto in mao:
                     ## Converter coordenadas normmalizadas para pixels
@@ -88,8 +180,9 @@ def main():
     ##  Capturar o vídeo pela webcam
     cap = cv2.VideoCapture(0)
 
-    ## Instanciar a classe do detector
+    ## Instanciar a classes
     detector = DetectorMaos()
+    detector_rosto = DetectorRosto()
 
     ## Realiza a captura
     while True:
@@ -101,6 +194,7 @@ def main():
 
         ## Realização da detecção das mãos
         detector.encontra_mao(imagem)
+        detector_rosto.encontra_rosto(imagem)
 
         ## mostra a imagem de captura
         cv2.imshow('Captura', imagem)
