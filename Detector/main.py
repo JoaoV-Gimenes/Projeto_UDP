@@ -19,7 +19,7 @@ class DetectorRosto:
         self.blendshapes = []
 
         options = FaceLandmarkerOptions(
-            base_options = python.BaseOptions(model_asset_path = 'face_landmarker.task'),
+            base_options = python.BaseOptions(model_asset_path = 'face_landmarker_v2_with_blendshapes.task'),
             running_mode = RunningMode.LIVE_STREAM,
             num_faces = max_rosto,
             min_face_detection_confidence = deteccao_confianca,
