@@ -18,6 +18,8 @@ Projeto de detecção de mãos e rosto em tempo real utilizando MediaPipe e Open
 pip install opencv-python
 pip install mediapipe
 pip install numpy
+pip install tensorflow
+pip install scikit-learn
 ```
 
 ### Bash
@@ -25,9 +27,9 @@ pip install numpy
 pip install opencv-python
 pip install mediapipe
 pip install numpy
+pip install tensorflow
+pip install scikit-learn
 ```
-
----
 
 ## Download dos Modelos
 
@@ -67,9 +69,16 @@ wget -O face_landmarker_v2_with_blendshapes.task https://storage.googleapis.com/
 
 ```
 Detector_de_mao/
-├── main.py
-├── hand_landmarker.task
-├── face_landmarker_v2_with_blendshapes.task
+├── dataset/                          # Vídeos e imagens dos sinais
+├── dados_extraidos/                  # Dados extraídos pelo coletar_dados.py
+├── main.py                           # Detecção em tempo real
+├── coletar_dados.py                  # Extrai pontos dos vídeos e imagens
+├── treinar_modelo.py                 # Treina os modelos de reconhecimento
+├── modelo_estatico.pkl               # Modelo treinado para letras estáticas
+├── modelo_dinamico.h5                # Modelo treinado para sinais dinâmicos
+├── hand_landmarker.task              # Modelo de detecção de mãos
+├── face_landmarker_v2_with_blendshapes.task  # Modelo de detecção de rosto
+├── requirements.txt                  # Bibliotecas necessárias
 └── README.md
 ```
 
@@ -77,6 +86,17 @@ Detector_de_mao/
 
 ## Como Rodar
 
+**Extrair pontos dos vídeos e imagens:**
+```bash
+python coletar_dados.py
+```
+
+**Treinar os modelos:**
+```bash
+python treinar_modelo.py
+```
+
+**Rodar a detecção em tempo real:**
 ```bash
 python main.py
 ```
@@ -89,5 +109,5 @@ python main.py
 - Detecção de rosto com malha facial, contornos e íris
 - Detecção de expressões faciais (blendshapes)
 - Histórico de movimentos para reconhecimento de gestos dinâmicos
-    
-        
+- Reconhecimento de sinais estáticos (letras do alfabeto)
+- Reconhecimento de sinais dinâmicos (palavras com movimento)
