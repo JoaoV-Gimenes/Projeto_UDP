@@ -90,23 +90,41 @@ if os.path.isdir(PASTA_DATASET):
                         frame_rgb = np.array(frame_rgb)
                         mp_frame = mp.Image(image_format= mp.ImageFormat.SRGB, data=frame_rgb )
 
+                        ## timestamp em que os frames serão analisados
                         timestamp = int(cap.get(cv2.CAP_PROP_POS_MSEC))
-                        resultado = detector_video_mao.detect_for_video(mp_frame, timestamp)
 
-                        if resultado.hand_landmarks:
-                            pontos = []
-                            for mao in resultado.hand_landmarks:
+                        ## salva o resultado com os pontos detectados nas mãos/rosto
+                        resultado_mao = detector_video_mao.detect_for_video(mp_frame, timestamp)
+                        resultado_rosto = detector_video_rosto.detect_for_video(mp_frame, timestamp)
+
+                        if resultado_mao.hand_landmarks:
+                            ## Salva a coordenada de cada ponto na mão
+                            pontos_mao = []
+                            for mao in resultado_mao.hand_landmarks:
                                 for ponto in mao:
                                     x = ponto.x
                                     y = ponto.y
                                     z = ponto.z
-                                    pontos.append([x, y, z])
+                                    pontos_mao.append([x, y, z])
+
+                            pontos_rosto = []
+                            if resultado_rosto.face_landmarks:
+                                for rosto in resultado_rosto.face_landmarks:
+                                    for i in PONTOS_ROSTO:
+                                        ponto = rosto[i]
+                                        pontos_rosto.append([ponto.x, ponto.y, ponto.z])
 
                             ## Caso for um vídeo de um sinal dinâmico ou não
                             if sinal in SINAIS_DINAMICOS:
-                                frames.append(pontos)
+                                frames.append({
+                                    'mao': pontos_mao,
+                                    'rosto': pontos_rosto
+                                })
                             else:
-                                frames = pontos
+                                frames = {
+                                    'mao': pontos_mao,
+                                    'rosto': pontos_rosto
+                                }
                                 break
 
                     ## Libera o vídeo para JSON
@@ -155,23 +173,35 @@ if os.path.isdir(PASTA_DATASET):
                     ## Muda para o formato aceito pelo mediapipe
                     mp_imagem = mp.Image(image_format= mp.ImageFormat.SRGB, data=imagem_rgb )
 
-                    ## salva o resultado com os pontos detectados nas mãos
-                    resultado = detector_imagem_mao.detect(mp_imagem)
+                    ## salva o resultado com os pontos detectados nas mãos/rosto
+                    resultado_mao = detector_imagem_mao.detect(mp_imagem)
+                    resultado_rosto = detector_imagem_rosto.detect(mp_imagem)
 
-                    if resultado.hand_landmarks:
-                        ## Salva a coordenada de cada ponto
-                        pontos = []
-                        for mao in resultado.hand_landmarks:
+                    if resultado_mao.hand_landmarks:
+                        ## Salva a coordenada de cada ponto na mão
+                        pontos_mao = []
+                        for mao in resultado_mao.hand_landmarks:
                             for ponto in mao:
                                 x = ponto.x
                                 y = ponto.y
                                 z = ponto.z
-                                pontos.append([x, y, z])
+                                pontos_mao.append([x, y, z])
+
+                        ## Salva a coordenada de cada ponto no rosto
+                        pontos_rosto = []
+                        if resultado_rosto.face_landmarks:
+                            for rosto in resultado_rosto.face_landmarks:
+                                for i in PONTOS_ROSTO:
+                                    ponto = rosto[i]
+                                    pontos_rosto.append([ponto.x, ponto.y, ponto.z])
 
                         dados = {
                             'sinal': sinal,
                             'tipo': 'estatico',
-                            'pontos': pontos
+                            'pontos': {
+                                'mao': pontos_mao,
+                                'rosto': pontos_rosto ## Lista vazia caso não encontre rosto
+                            }
                         }
 
                         ## Cria uma pasta do sinal dentro de PASTA_SAIDA caso não tenha

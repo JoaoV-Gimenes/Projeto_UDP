@@ -109,7 +109,7 @@ class DetectorMaos:
         self.cor_conexoes = cor_conexoes
         self.resultado = None
         self.historico = []
-        self.janela_frames = 30
+        self.janela_frames = 60
 
         ## Configurar o HandLandmarker
         options = HandLandmarkerOptions(
