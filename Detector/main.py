@@ -204,6 +204,7 @@ def main():
     detector = DetectorMaos()
     detector_rosto = DetectorRosto()
 
+    contador = 0
     ## Realiza a captura
     while True:
         ## Obtem a imagem
@@ -232,7 +233,7 @@ def main():
 
         ## Só classifica se detectou mão
         if pontos_mao:
-            if len(detector.historico) >= 60:
+            if len(detector.historico) >= 60 and contador%5==0:
                 ## Pega os últimos 60 frames do histórico
                 sequencia_mao = [frames['pontos'] for frames in detector.historico[-60:]]
                 sequencia_mao = np.array([sequencia_mao]) ## Formato (1, 60, 63)
@@ -258,6 +259,8 @@ def main():
 
         ## Tempo de atualização da captura
         cv2.waitKey(1)
+
+        contador += 1
 
 
 if __name__ == '__main__':
