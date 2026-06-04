@@ -10,6 +10,20 @@ from tensorflow import keras
 from sklearn.preprocessing import LabelEncoder
 from sklearn.metrics import accuracy_score
 from tensorflow.keras.preprocessing.sequence import pad_sequences
+from tensorflow.keras.layers import Input, LSTM, Dense, concatenate
+from tensorflow.keras.models import Model
+
+## Adicionar no início do código, após os imports
+PASTA_SAIDA = 'dados_extraidos'
+
+## Índices dos pontos principais do rosto
+CONTORNO = [10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288, 397, 365, 379, 378, 400, 377, 152, 148, 176, 149, 150, 136, 172, 58, 132, 93, 234, 127, 162, 21, 54, 103, 67, 109]
+LABIOS = [61, 146, 91, 181, 84, 17, 314, 405, 321, 375, 291, 308, 324, 318, 402, 317, 14, 87, 178, 88, 95]
+OLHO_ESQ = [33, 7, 163, 144, 145, 153, 154, 155, 133, 173, 157, 158, 159, 160, 161, 246]
+OLHO_DIR = [362, 382, 381, 380, 374, 373, 390, 249, 263, 466, 388, 387, 386, 385, 384, 398]
+SOBRANCELHA_ESQ = [70, 63, 105, 66, 107, 55, 65, 52, 53, 46]
+SOBRANCELHA_DIR = [300, 293, 334, 296, 336, 285, 295, 282, 283, 276]
+PONTOS_ROSTO = CONTORNO + LABIOS + OLHO_ESQ + OLHO_DIR + SOBRANCELHA_ESQ + SOBRANCELHA_DIR
 
 ## Listas para armazenar os pontos de cada imagem/frame
 
@@ -94,3 +108,61 @@ X_teste_dinamico_mao = pad_sequences(X_teste_dinamico_mao, maxlen= 60, padding='
 
 X_treino_dinamico_rosto = pad_sequences(X_treino_dinamico_rosto, maxlen=60, padding='pre', truncating='pre', dtype='float32')
 X_teste_dinamico_rosto = pad_sequences(X_teste_dinamico_rosto, maxlen=60, padding='pre', truncating='pre', dtype='float32')
+
+## Quantos pontos do rosto estamos usando
+N = len(PONTOS_ROSTO) * 3  ## quantidade de pontos × 3 coordenadas (x, y, z)
+
+## Número de sinais dinâmicos
+num_sinais = len(np.unique(y_dinamico))
+
+## Entrada 1 - mao
+entrada_mao = Input(shape=(60, 63))     ## 60 frames / 63 valores por frame
+lstm_mao = LSTM(64)(entrada_mao)        ## Processa a sequência da mão
+
+## Entrada 2 - rosto
+entrada_rosto = Input(shape=(60, N))        ## 60 frames / N valores por frame
+lstm_rosto = LSTM(32)(entrada_rosto)        ## Processa a sequência do rosto
+
+## Junta os dois
+combinado = concatenate([lstm_mao, lstm_rosto])
+
+## Camadas finais
+denso = Dense(64, activation='relu')(combinado)
+saida = Dense(num_sinais, activation='softmax')(denso)
+
+## modelo dinãmico
+modelo_dinamico = Model(inputs=[entrada_mao, entrada_rosto], outputs=saida)
+
+modelo_dinamico.compile(
+    optimizer='adam',
+    loss='sparse_categorical_crossentropy',
+    metrics=['accuracy']
+)
+
+modelo_dinamico.fit(
+    [X_treino_dinamico_mao, X_treino_dinamico_rosto],
+    y_treino_dinamico,
+    epochs=50
+)
+
+## Avaliação modelo dinãmico
+y_previsao_din = modelo_dinamico.predict([X_teste_dinamico_mao, X_teste_dinamico_rosto])
+## Pega o indice com maior probabilidade
+y_previsao_din = np.argmax(y_previsao_din, axis=1)
+precisao_din = accuracy_score(y_teste_dinamico, y_previsao_din)
+print(f'Precisão do modelo dinâmico: {precisao_din * 100:.2f}%')
+
+## Salvamento dos modelos
+
+## Modelo Estático
+with open('modelo_estatico.pkl', 'wb') as f:
+    pickle.dump(modelo_estatico, f)
+
+with open('le_estatico.pkl', 'wb') as f:
+    pickle.dump(le_estatico, f)
+
+## Modelo Dinâmico
+modelo_dinamico.save('modelo_dinamico.h5')
+
+with open('le_dinamico.pkl', 'wb') as f:
+    pickle.dump(le_dinamico, f)

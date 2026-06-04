@@ -5,9 +5,10 @@ import numpy as np
 import mediapipe as mp
 from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
-import matplotlib.pyplot as plt
 from mediapipe.tasks.python.vision import HandLandmarker, HandLandmarkerOptions, RunningMode, drawing_utils, drawing_styles, FaceLandmarker, FaceLandmarkerOptions
 import time
+import pickle
+from tensorflow.keras.models import load_model
 
 
 class DetectorRosto:
@@ -174,7 +175,26 @@ class DetectorMaos:
                     ## desenhar ponto
                     cv2.circle(imagem, (x, y), 5, self.cor_pontos, -1)
 
+## Índices dos pontos principais do rosto
+CONTORNO = [10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288, 397, 365, 379, 378, 400, 377, 152, 148, 176, 149, 150, 136, 172, 58, 132, 93, 234, 127, 162, 21, 54, 103, 67, 109]
+LABIOS = [61, 146, 91, 181, 84, 17, 314, 405, 321, 375, 291, 308, 324, 318, 402, 317, 14, 87, 178, 88, 95]
+OLHO_ESQ = [33, 7, 163, 144, 145, 153, 154, 155, 133, 173, 157, 158, 159, 160, 161, 246]
+OLHO_DIR = [362, 382, 381, 380, 374, 373, 390, 249, 263, 466, 388, 387, 386, 385, 384, 398]
+SOBRANCELHA_ESQ = [70, 63, 105, 66, 107, 55, 65, 52, 53, 46]
+SOBRANCELHA_DIR = [300, 293, 334, 296, 336, 285, 295, 282, 283, 276]
+PONTOS_ROSTO = CONTORNO + LABIOS + OLHO_ESQ + OLHO_DIR + SOBRANCELHA_ESQ + SOBRANCELHA_DIR
 
+## Carrega os modelos
+with open('modelo_estatico.pkl', 'rb') as f:
+    modelo_estatico = pickle.load(f)
+
+with open('le_estatico.pkl', 'rb') as f:
+    le_estatico = pickle.load(f)
+
+with open('le_dinamico.pkl', 'rb') as f:
+    le_dinamico = pickle.load(f)
+
+modelo_dinamico = load_model('modelo_dinamico.h5')
 
 def main():
     ##  Capturar o vídeo pela webcam
@@ -195,6 +215,43 @@ def main():
         ## Realização da detecção das mãos
         detector.encontra_mao(imagem)
         detector_rosto.encontra_rosto(imagem)
+
+        ## Salva os pontos para análise
+        pontos_mao = []
+        if detector.resultado and detector.resultado.hand_landmarks:
+            for mao in detector.resultado.hand_landmarks:
+                for ponto in mao:
+                    pontos_mao.append([ponto.x, ponto.y, ponto.z])
+
+        pontos_rosto = []
+        if detector_rosto.resultado and detector_rosto.resultado.face_landmarks:
+            for rosto in detector_rosto.resultado.face_landmarks:
+                for i in PONTOS_ROSTO:
+                    ponto = rosto[i]
+                    pontos_rosto.append([ponto.x, ponto.y, ponto.z])
+
+        ## Só classifica se detectou mão
+        if pontos_mao:
+            if len(detector.historico) >= 60:
+                ## Pega os últimos 60 frames do histórico
+                sequencia_mao = [frames['pontos'] for frames in detector.historico[-60:]]
+                sequencia_mao = np.array([sequencia_mao]) ## Formato (1, 60, 63)
+
+                ## rosto do frame atual
+                sequencia_rosto = np.array([pontos_rosto]* 60) ## repete o rosto atual 60 vezes
+                sequencia_rosto = sequencia_rosto.reshape(1, 60, -1) ## Formato (1, 60, N)
+
+                ## Passar para o modelo
+                previsao = modelo_dinamico.predict([sequencia_mao, sequencia_rosto])
+                indice = np.argmax(previsao)
+                letra = le_dinamico.inverse_transform([indice])[0]
+                cv2.putText(imagem, letra, (10, 50), cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 255, 0), 3)
+            else:
+                entrada = np.array(pontos_mao + pontos_rosto).flatten()
+                entrada = entrada.reshape(1, -1)
+                previsao = modelo_estatico.predict(entrada)
+                letra = le_estatico.inverse_transform(previsao)[0]
+                cv2.putText(imagem, letra, (10, 50), cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 255, 0), 3)
 
         ## mostra a imagem de captura
         cv2.imshow('Captura', imagem)
