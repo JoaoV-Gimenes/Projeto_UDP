@@ -262,7 +262,7 @@ if os.path.isdir(PASTA_DATASET):
                     print(f'✓ {sinal} - {arquivo} espelhado processado!')
 
                 ## Caso for imagem
-                elif arquivo.endswith('.png'):
+                elif arquivo.endswith('.png') or arquivo.endswith('.jpg'):
 
                     ## pega o caminho da imagem e a lê
                     caminho_imagem = os.path.join(caminho_sinal, arquivo)
@@ -311,12 +311,13 @@ if os.path.isdir(PASTA_DATASET):
                         os.makedirs(pasta_saida_sinal, exist_ok=True)
 
                         ## Substitui o tipo do arquivo para .json
-                        nome_arquivo = arquivo.replace('.png', '.json')
+                        nome_arquivo_png = arquivo.replace('.png', '.json').replace('.jpg', '.json')
 
                         ## Coloca o arquivo e .json na pasta_saida_sinal
-                        caminho_saida = os.path.join(pasta_saida_sinal, nome_arquivo)
+                        caminho_saida_png = os.path.join(pasta_saida_sinal, nome_arquivo_png)
 
-                        with open(caminho_saida, 'w') as f:
+                        ## Salva os dados
+                        with open(caminho_saida_png, 'w') as f:
                             json.dump(dados, f)
 
                         print(f'✓ {sinal} - {arquivo} processado!')
